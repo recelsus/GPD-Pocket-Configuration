@@ -1,13 +1,12 @@
 # Packages
 
-`
+```
 sudo
 base-devel
 vim
 neovim
 git
 iwd
-tlp
 rustup
 
 xorg-init
@@ -32,7 +31,7 @@ curl
 unzip
 zip
 rsync
-`
+```
 
 # AUR
 
