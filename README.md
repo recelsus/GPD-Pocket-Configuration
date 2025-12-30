@@ -3,10 +3,11 @@
 ```
 sudo
 base-devel
+iwd
+
 vim
 neovim
 git
-iwd
 rustup
 
 xorg-init
@@ -110,7 +111,34 @@ sudo systemctl start systemd-networkd
 
 sudo systemctl enable systemd-resolved
 sudo systemctl start systemd-resolved
-
-sudo systemctl enable tlp
-sudo systemctl start tlp
 ```
+
+# Battery Charge
+
+```
+sudo install -d /usr/local/sbin
+sudo tee /usr/local/sbin/gpd_charge_fix >/dev/null <<'EOF'
+#!/bin/sh
+# GPD Pocket: restore bq24190 input current limit
+
+CHG=/sys/class/power_supply/bq24190-charger
+
+if [ -r "$CHG/online" ] && [ "$(cat "$CHG/online")" = "1" ]; then
+  echo 2000000 > "$CHG/input_current_limit" # 2A
+fi
+EOF
+sudo chmod +x /usr/local/sbin/gpd_charge_fix
+
+```
+
+```
+sudo tee /etc/udev/rules.d/90-gpd-bq24190.rules >/dev/null <<'EOF'
+SUBSYSTEM=="power_supply", KERNEL=="bq24190-charger", ACTION=="change", RUN+="/usr/local/sbin/gpd_charge_fix"
+EOF
+```
+
+```
+sudo udevadm control --reload-rules
+sudo udevadm trigger -s power_supply
+```
+
