@@ -1,4 +1,11 @@
-# Packages
+# Arch Linux on GPD Pocket(Z8750)
+
+## Description
+GPD Pocket初代にArchLinuxをインストールしたときの設定と端末固有問題のメモ
+
+## Packages
+
+必須パッケージ群
 
 ```
 sudo
@@ -34,9 +41,9 @@ zip
 rsync
 ```
 
-# AUR
+## AUR
 
-`paru`
+AURのパッケージマネージャー`paru`のビルド
 
 ```bash
 rustup default stable
@@ -44,17 +51,62 @@ git clone https://aur.archlinux.org/paru.git
 cd paru
 makepkg -si
 ```
+## Service
 
-# Config
+パッケージインストール後 サービスだけ開始しておきます
+systemd-networkdとsystemd-resolvedは既に実行されているかもしれませんが一応
 
+```bash
+sudo systemctl enable iwd
+sudo systemctl start iwd
+
+sudo systemctl enable systemd-networkd
+sudo systemctl start systemd-networkd
+
+sudo systemctl enable systemd-resolved
+sudo systemctl start systemd-resolved
+```
+
+## Network
+
+```bash
+iwctl
+```
+
+```
+[iwd]# device list
+[iwd]# station wlan0 scan
+[iwd]# station wlan0 get-networks
+[iwd]# station wlan0 connect SSID_NAME
+```
+
+接続成功すると`/var/lib/iwd/SSID_NAME.psk`に設定が保存されます.
+
+
+## Config
+
+#### Intel i915 GPUドライバの設定  
 `sudo vim /etc/modprobe.d/i915.conf`
 
 ```
 options i915 enable_psr=0 enable_fbc=0 enable_dc=0
 ```
 
-`sudo mkinit cpio -P`
+- enable_psr=0
+  - Panel Self Refreshの無効化
+  - eDP/DSIパネルの省電力機能, 復帰不能のブラックアウト対策
 
+- enable_fbc=0
+  - Frame Buffer Compressionの無効化
+  - フレームバッファの圧縮, xrandrのrotale/scaleと相性が悪いようなのでこれも停止
+
+- enable_dc=0
+  - Display C-statesの無効化
+  - DPMSがONでも画面が戻らない問題回避
+
+`sudo mkinitcpio -P`
+
+#### 
 
 `sudo vim /boot/loader/entries/yyyy-MM-dd_HH-mm-ss_linux.conf
 `
@@ -62,6 +114,11 @@ options i915 enable_psr=0 enable_fbc=0 enable_dc=0
 ```
 options root=PARTUUID=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee rw rootfstype=ext4 acpi_backlight=vendor
 ```
+
+- acpi_backlight=vendor
+  - ACPIの汎用バックライト制御を無効化します
+  - acpi_video[i]を見つけてしまうので明示的に無視させます
+  - 使えない を 使わない と明示しているだけなのでこの項目に関してはやらなくても問題ナシ
 
 `sudo vim /etc/systemd/logind.conf
 `
@@ -71,6 +128,16 @@ HandleSuspendKey=ignore
 HandleLidSwitch=ignore
 IdleAction=ignore
 ```
+
+- HandleSuspendKey
+  - 物理キーでのサスペンドを無効化
+- HandleLidSwitch=ignore
+  - 画面を閉じたときのサスペンドを無効化
+- IdleAction=ignore
+  - 放置したときの自動サスペンドを無効化
+
+総じて全てサスペンド(スリープ)の無効化です  
+スリープ復帰時に画面表示が戻ってこない症状が起きるため
 
 `vim $HOME/.xinitrc`
 
@@ -87,7 +154,6 @@ xrandr --output "$primary_out" \
        --scale "${scale_xy}" \
        --filter nearest \
        || true
-       # --panning 1920x1200+0+0 || true
 
 xset s off
 xset -dpms
@@ -102,18 +168,14 @@ fcitx5 &
 exec i3
 ```
 
-```bash
-sudo systemctl enable iwd
-sudo systemctl start iwd
-
-sudo systemctl enable systemd-networkd
-sudo systemctl start systemd-networkd
-
-sudo systemctl enable systemd-resolved
-sudo systemctl start systemd-resolved
-```
 
 # Battery Charge
+
+給電ケーブル接続時に十分な給電が行われず 接続中でもバッテリーが減る問題の対処  
+電源OFF時と接続のままOS起動時には9Wを維持していましたが, 一度抜いて再度挿すと2W(0.5A)まで落ちていることから電源制御関連の修正  
+
+`/sys/class/power_supply/bq24190-charger`の値を変更すると給電量が変化したことを確認できたのでudevでこれを制御させています  
+あと最大の9Wではなく4Wが安定して良さそうだったので2Aに設定 充電は遅いですが刺したままなら減らないライン
 
 ```
 sudo install -d /usr/local/sbin
