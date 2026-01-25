@@ -142,23 +142,24 @@ IdleAction=ignore
 `vim $HOME/.xinitrc`
 
 ```
-primary_out="$(xrandr --query | awk '/ connected primary/{print $1; exit}')"
-if [ -z "${primary_out:-}" ]; then
+exec >>~/.xinitrc.log 2>&1
+set -x
+date
+
+primary_out=""
+for _ in 1 2 3 4 5 6 7 8 9 10; do
   primary_out="$(xrandr --query | awk '/ connected/{print $1; exit}')"
+  [ -n "$primary_out" ] && break
+  sleep 0.2
+done
+
+if [ -n "${primary_out:-}" ]; then
+  xrandr --output "$primary_out" --rotate right || true
 fi
-
-scale_xy="0.7x0.7"
-
-xrandr --output "$primary_out" \
-       --rotate right \
-       --scale "${scale_xy}" \
-       --filter nearest \
-       || true
 
 xset s off
 xset -dpms
 xset s noblank
-
 setxkbmap -option caps:none
 
 export GTK_IM_MODULE=fcitx
